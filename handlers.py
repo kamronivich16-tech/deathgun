@@ -167,7 +167,7 @@ async def process_game(msg, user_id, bet, state):
     await state.clear()
     
     if game_type == "dice":
-        m = await msg.answer_dice("🎲")
+        m = await msg.answer_dice(emoji="🎲")
         await asyncio.sleep(3)
         if m.dice.value >= 4:
             mult = random.choice([1.5, 2.0, 3.0])
@@ -179,7 +179,7 @@ async def process_game(msg, user_id, bet, state):
             await msg.answer(f"🌑 **Проигрыш!**\n💸 Потеряно: `-{bet:,}`")
             
     elif game_type == "slots":
-        m = await msg.answer_dice("🎰")
+        m = await msg.answer_dice(emoji="🎰")
         await asyncio.sleep(3)
         # Упрощенная логика слотов aiogram
         # 1, 22, 43, 64 - джекпоты
@@ -347,6 +347,8 @@ async def admin_id_input(message: Message, state: FSMContext):
 async def admin_amount_input(message: Message, state: FSMContext):
     if not message.text.isdigit(): return await message.answer("❌ Введите число!")
     amount = int(message.text)
+    if amount > 10**15:
+        return await message.answer("❌ Сумма слишком большая!")
     data = await state.get_data()
     target_id = data['target_id']
     act = data['admin_act']
@@ -361,8 +363,15 @@ async def cmd_give(message: Message):
     if message.from_user.id not in config.ADMINS: return
     args = message.text.split()
     if len(args) < 3: return await message.answer("ℹ️ `/give ID сумма`")
-    await db.update_balance(int(args[1]), int(args[2]))
-    await message.answer("✅ Выдано!")
+    try:
+        target_id = int(args[1])
+        amount = int(args[2])
+        if abs(amount) > 10**15 or abs(target_id) > 10**15:
+            raise ValueError
+        await db.update_balance(target_id, amount)
+        await message.answer("✅ Выдано!")
+    except ValueError:
+        await message.answer("❌ Неверные значения или числа слишком большие!")
 
 @router.message(F.text == "💹 Курс")
 async def course_cmd(message: Message):
