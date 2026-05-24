@@ -18,7 +18,7 @@ async def main():
     dp.message.middleware(BanMiddleware())
     dp.callback_query.middleware(BanMiddleware())
 
-    print("🚀 Бот запущен и готов к работе!")
+    print("Bot started and ready!")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
