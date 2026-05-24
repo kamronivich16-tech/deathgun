@@ -19,6 +19,7 @@ async def main():
     dp.callback_query.middleware(BanMiddleware())
 
     print("Bot started and ready!")
+    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
