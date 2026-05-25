@@ -526,9 +526,77 @@ async def cmd_give(message: Message):
 async def course_cmd(message: Message):
     await message.answer("💹 **Актуальный курс:**\n\n💎 1 TON = `450,000` Искр\n🔥 1 Искра = `0.0000022` TON")
 
+MARKET_ITEMS = {
+    "crown": {"name": "👑 Корона", "coins": 500000, "ton": 1.0},
+    "diamond": {"name": "💎 Алмаз", "coins": 200000, "ton": 0.5},
+    "lambo": {"name": "🚗 Ламба", "coins": 100000, "ton": 0.25},
+    "pizza": {"name": "🍕 Пицца", "coins": 50000, "ton": 0.1},
+    "star": {"name": "🌟 Звезда", "coins": 10000, "ton": 0.05},
+    "lightning": {"name": "⚡️ Молния", "coins": 5000, "ton": 0.02},
+}
+
 @router.message(F.text == "🛍 Маркет")
 async def market_cmd(message: Message):
-    await message.answer("🛍 **Маркет временно не доступен.**\nСкоро здесь появятся лучшие предложения!")
+    kb = []
+    for item_id, item_data in MARKET_ITEMS.items():
+        kb.append([InlineKeyboardButton(text=f"{item_data['name']} — {item_data['coins']:,} монет / {item_data['ton']} TON", callback_data=f"market_buy_{item_id}")])
+    
+    await message.answer("🛍 **Официальный Маркет Подарков**\nЗдесь вы можете приобрести NFT подарки за свои монеты или TON:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+
+@router.callback_query(F.data.startswith("market_buy_"))
+async def market_buy_callback(callback: CallbackQuery):
+    item_id = callback.data.split("_")[2]
+    if item_id not in MARKET_ITEMS:
+        return await callback.answer("❌ Товар не найден!", show_alert=True)
+        
+    item = MARKET_ITEMS[item_id]
+    
+    kb = [
+        [
+            InlineKeyboardButton(text=f"💰 {item['coins']:,} монет", callback_data=f"market_pay_coins_{item_id}"),
+            InlineKeyboardButton(text=f"💎 {item['ton']} TON", callback_data=f"market_pay_ton_{item_id}")
+        ],
+        [InlineKeyboardButton(text="❌ Отмена", callback_data="menu_back")]
+    ]
+    
+    await callback.message.edit_text(
+        f"🛍 **Покупка NFT:**\n\n"
+        f"🎁 Подарок: **{item['name']}**\n"
+        f"Выберите способ оплаты:",
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=kb)
+    )
+
+@router.callback_query(F.data.startswith("market_pay_"))
+async def market_pay_callback(callback: CallbackQuery):
+    parts = callback.data.split("_")
+    method = parts[2]
+    item_id = parts[3]
+    
+    if item_id not in MARKET_ITEMS:
+        return await callback.answer("❌ Товар не найден!", show_alert=True)
+        
+    item = MARKET_ITEMS[item_id]
+    user = await db.get_user(callback.from_user.id)
+    
+    if method == "coins":
+        if user[2] < item['coins']:
+            return await callback.answer("❌ Недостаточно монет!", show_alert=True)
+        await db.update_balance(callback.from_user.id, -item['coins'])
+        cost_text = f"💰 {item['coins']:,} монет"
+    else:
+        if user[6] < item['ton']:
+            return await callback.answer("❌ Недостаточно TON!", show_alert=True)
+        await db.update_ton(callback.from_user.id, -item['ton'])
+        cost_text = f"💎 {item['ton']} TON"
+        
+    await db.add_nft(callback.from_user.id, item['name'])
+    
+    await callback.message.edit_text(
+        f"🎉 **Успешная покупка!**\n\n"
+        f"🎁 Вы купили **{item['name']}** за {cost_text}!\n"
+        f"Подарок добавлен в ваш инвентарь. Используйте `🎁 Мои подарки` чтобы посмотреть."
+    )
+    await callback.answer("✅ Куплено!")
 
 @router.message(F.text == "🎁 Мои подарки")
 async def my_gifts_cmd(message: Message):
