@@ -3,13 +3,22 @@ import random
 from datetime import datetime, timedelta
 from aiogram import Router, F
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
-from aiogram.filters import Command
+from aiogram.filters import Command, BaseFilter
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.fsm.context import FSMContext
 import db
 import config
 
 router = Router()
+
+class TextStartsWith(BaseFilter):
+    def __init__(self, *prefixes: str):
+        self.prefixes = tuple(p.lower() for p in prefixes)
+
+    async def __call__(self, message: Message) -> bool:
+        if not message.text:
+            return False
+        return message.text.lower().startswith(self.prefixes)
 
 class GameStates(StatesGroup):
     waiting_for_bet = State()
@@ -554,7 +563,7 @@ async def my_assets_cmd(message: Message):
     user = await db.get_user(message.from_user.id)
     await message.answer(f"📈 **Ваши активы:**\n\n💰 Баланс: `{user[2]:,}` монет\n💎 TON: `{user[6]:.2f}` TON")
 
-@router.message(F.text.lower().startswith("📌 закрепить") | F.text.lower().startswith("закрепить"))
+@router.message(TextStartsWith("📌 закрепить", "закрепить"))
 async def equip_gift_cmd(message: Message):
     text = message.text
     if text.lower().startswith("📌 закрепить"):
@@ -591,7 +600,7 @@ async def equip_gift_cmd(message: Message):
     await db.equip_nft(nft_id, slot)
     await message.answer(f"✅ Подарок **{nft[2]}** (ID: `{nft_id}`) закреплен на слот `{slot}`!")
 
-@router.message(F.text.lower().startswith("🕶 надеть") | F.text.lower().startswith("надеть"))
+@router.message(TextStartsWith("🕶 надеть", "надеть"))
 async def equip_auto_cmd(message: Message):
     text = message.text
     if text.lower().startswith("🕶 надеть"):
@@ -636,7 +645,7 @@ async def equip_auto_cmd(message: Message):
     await db.equip_nft(nft_id, free_slot)
     await message.answer(f"✅ Подарок **{nft[2]}** (ID: `{nft_id}`) надет на слот `{free_slot}`!")
 
-@router.message(F.text.lower().startswith("✂️ открепить") | F.text.lower().startswith("открепить"))
+@router.message(TextStartsWith("✂️ открепить", "открепить"))
 async def unequip_gift_cmd(message: Message):
     text = message.text
     if text.lower().startswith("✂️ открепить"):
@@ -664,7 +673,7 @@ async def unequip_gift_cmd(message: Message):
     await db.unequip_nft(message.from_user.id, slot)
     await message.answer(f"✅ Подарок **{equipped_nft[2]}** откреплен из слота `{slot}`!")
 
-@router.message(F.text.lower().startswith("🔍 сподарок") | F.text.lower().startswith("сподарок"))
+@router.message(TextStartsWith("🔍 сподарок", "сподарок"))
 async def inspect_gift_cmd(message: Message):
     text = message.text
     if text.lower().startswith("🔍 сподарок"):
@@ -703,7 +712,7 @@ async def inspect_gift_cmd(message: Message):
     )
     await message.answer(text_info)
 
-@router.message(F.text.lower().startswith("✨ стоимость улучшения") | (F.text == "✨ Стоимость улучшения"))
+@router.message(TextStartsWith("✨ стоимость улучшения"))
 async def upgrade_costs_cmd(message: Message):
     text = (
         "✨ **Стоимость улучшения NFT подарков:**\n\n"
@@ -720,7 +729,7 @@ async def upgrade_costs_cmd(message: Message):
     )
     await message.answer(text)
 
-@router.message(F.text.lower().startswith("🆙 подарок улучшить") | F.text.lower().startswith("подарок улучшить"))
+@router.message(TextStartsWith("🆙 подарок улучшить", "подарок улучшить"))
 async def upgrade_gift_cmd(message: Message):
     text = message.text
     if text.lower().startswith("🆙 подарок улучшить"):
@@ -803,7 +812,7 @@ async def upgrade_confirm_callback(callback: CallbackQuery):
     )
     await callback.answer("✅ Улучшено!")
 
-@router.message(F.text.lower().startswith("🗄 передать") | F.text.lower().startswith("передать"))
+@router.message(TextStartsWith("🗄 передать", "передать"))
 async def transfer_gift_cmd(message: Message):
     text = message.text
     if text.lower().startswith("🗄 передать"):
