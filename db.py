@@ -11,9 +11,15 @@ async def init_db():
                 username TEXT,
                 balance INTEGER DEFAULT 5000,
                 last_bonus TIMESTAMP,
-                is_banned INTEGER DEFAULT 0
+                is_banned INTEGER DEFAULT 0,
+                referrer_id INTEGER
             )
         """)
+        # Безопасно добавляем колонку, если база данных уже существовала без неё
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN referrer_id INTEGER")
+        except Exception:
+            pass
         await db.execute("""
             CREATE TABLE IF NOT EXISTS nfts (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,11 +37,18 @@ async def get_user(user_id):
         async with db.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)) as cursor:
             return await cursor.fetchone()
 
-async def add_user(user_id, username):
+async def add_user(user_id, username, referrer_id=None):
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute("INSERT OR IGNORE INTO users (user_id, username, balance) VALUES (?, ?, ?)", 
-                         (user_id, username or "User", 5000))
-        await db.commit()
+        async with db.execute("SELECT user_id FROM users WHERE user_id = ?", (user_id,)) as cursor:
+            exists = await cursor.fetchone()
+        if not exists:
+            await db.execute(
+                "INSERT INTO users (user_id, username, balance, referrer_id) VALUES (?, ?, ?, ?)", 
+                (user_id, username or "User", 5000, referrer_id)
+            )
+            await db.commit()
+            return True  # Пользователь новый
+        return False  # Пользователь уже существовал
 
 async def update_balance(user_id, amount):
     async with aiosqlite.connect(DB_PATH) as db:

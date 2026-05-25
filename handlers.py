@@ -62,7 +62,28 @@ HELP_TEXT = """Игрок, разделы команд:
 @router.message(Command("start"))
 async def start_cmd(message: Message, state: FSMContext):
     await state.clear()
-    await db.add_user(message.from_user.id, message.from_user.username)
+    
+    # Реферальная система
+    args = message.text.split()
+    referrer_id = None
+    if len(args) > 1 and args[1].isdigit():
+        ref_val = int(args[1])
+        if ref_val != message.from_user.id:
+            referrer_id = ref_val
+    
+    is_new = await db.add_user(message.from_user.id, message.from_user.username, referrer_id)
+    
+    if is_new and referrer_id:
+        # Выдаем 10 000 монет пригласителю
+        await db.update_balance(referrer_id, 10000)
+        try:
+            await message.bot.send_message(
+                chat_id=referrer_id,
+                text=f"👥 По вашей реферальной ссылке зарегистрировался новый игрок: @{message.from_user.username or 'без юзера'}\n💰 Вам зачислено `+10,000` монет!"
+            )
+        except Exception:
+            pass
+            
     await message.answer(
         "👋 **Добро пожаловать в H8E1 Clone!**\n\nВыбери раздел ниже для ознакомления:",
         reply_markup=get_main_kb(message.from_user.id)
@@ -78,7 +99,16 @@ async def menu_msg(message: Message, state: FSMContext):
 async def profile_msg(message: Message, state: FSMContext):
     await state.clear()
     user = await db.get_user(message.from_user.id)
-    text = f"👤 **Профиль:**\n\n🆔 ID: `{user[0]}`\n💰 Баланс: `{user[2]:,}`"
+    bot_info = await message.bot.get_me()
+    ref_link = f"https://t.me/{bot_info.username}?start={message.from_user.id}"
+    text = (
+        f"👤 **Профиль:**\n\n"
+        f"🆔 ID: `{user[0]}`\n"
+        f"💰 Баланс: `{user[2]:,}` монет\n\n"
+        f"👥 **Реферальная система:**\n"
+        f"Приглашай друзей и получай `+10,000` монет за каждого нового игрока!\n\n"
+        f"🔗 **Твоя реферальная ссылка:**\n`{ref_link}`"
+    )
     await message.answer(text)
 
 @router.message(F.text == "🏆 Топ")
@@ -217,7 +247,7 @@ async def handle_menu(callback: CallbackQuery, state: FSMContext):
         "0": "ℹ️ **О боте**\n\nЭто полноценный клон игрового бота H8E1.\nЗдесь вы можете играть, зарабатывать монеты и соревноваться в топе!",
         "1": "🌐 **Основные команды**\n\n/start — Главное меню\n/profile — Ваш профиль\n/top — Список богачей\n/give ID сумма — Выдать монеты (админ)",
         "2": "🎮 **Игровой процесс**\n\nВ нашем боте есть 3 вида игр:\n1. 🎲 Кости\n2. 🎰 Слоты\n3. 🪙 Монетка\n\nВсе игры имеют систему случайных множителей до x50!",
-        "3": "💸 **Заработок**\n\nЗдесь вы можете получить бесплатные монеты раз в 24 часа. Нажмите кнопку ниже!",
+        "3": "💸 **Заработок**\n\n🎁 Получайте бесплатные монеты раз в 24 часа.\n\n👥 **Реферальная программа:**\nПриглашайте друзей и получайте `+10,000` монет за каждого нового игрока!\nВаша ссылка для приглашения находится в разделе 👤 **Профиль**.",
         "4": """Игрок, команды для биржи:
 
 🛍 Маркет — торговая площадка активов
@@ -268,7 +298,7 @@ async def help_number_cmd(message: Message, state: FSMContext):
         "0": "ℹ️ **О боте**\n\nЭто полноценный клон игрового бота H8E1.",
         "1": "🌐 **Основные команды**\n\n/start — Главное меню\n/profile — Ваш профиль\n/top — Список богачей",
         "2": "🎮 **Игровой процесс**\n\nВ нашем боте есть 3 вида игр:\n1. 🎲 Кости\n2. 🎰 Слоты\n3. 🪙 Монетка",
-        "3": "💸 **Заработок**\n\nПолучайте бонусы раз в 24 часа!",
+        "3": "💸 **Заработок**\n\nПолучайте бонусы раз в 24 часа и приглашайте друзей (10,000 монет за каждого нового игрока)!",
         "4": "📊 **Биржа / NFT**\n\nИспользуйте команды со скриншота для управления активами.",
         "5": "💰 **Меню доната**\n\nСвяжитесь с админом для покупки монет.",
         "6": "⚙️ **Настройки профиля**\n\nРаздел в разработке.",
